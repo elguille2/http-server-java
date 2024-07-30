@@ -1,4 +1,6 @@
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -12,8 +14,6 @@ public class Main {
     private void startServer() {
         // Try-with-resources to automatically close the server socket
         try (ServerSocket serverSocket = new ServerSocket(4221)){
-            // Since the tester restarts your program quite often, setting SO_REUSEADDR
-            // ensures that we don't run into 'Address already in use' errors
             serverSocket.setReuseAddress(true);
 
             while(true){
@@ -28,11 +28,14 @@ public class Main {
 
     private void handleClientConnection(Socket clientSocket) {
       // Try-with-resources to automatically close the output stream
-      try (OutputStream outputStream = clientSocket.getOutputStream()) {
-          String httpResponse = "HTTP/1.1 200 OK\r\n\r\n";
-          outputStream.write(httpResponse.getBytes("UTF-8"));
-          // Ensure all data is sent by flushing the output stream
-          outputStream.flush();
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+           OutputStream outputStream = clientSocket.getOutputStream()
+      ) {
+          String requestLine = reader.readLine();
+          if(requestLine != null && !requestLine.isEmpty()){
+              System.out.println("Request Line: " + requestLine);
+              handleRequest(requestLine, outputStream);
+          }
       } catch (IOException e){
           System.out.println("IOException while handling client connection: " + e.getMessage());
       } finally {
@@ -42,5 +45,28 @@ public class Main {
               System.out.println("IOException while closing client socket: " + e.getMessage());
           }
       }
+    }
+
+    private void handleRequest(String requestLine, OutputStream outputStream) throws IOException{
+      String[] requestParts = requestLine.split(" ");
+      if (requestParts.length >= 2){
+          String method = requestParts[0];
+          String path = requestParts[1];
+          String version = requestParts[2];
+
+          if (method.equals("GET")){
+              if (path.equals("/")){
+                  sendResponse(outputStream, "HTTP/1.1 200 OK\r\n\r\n");
+              } else {
+                  sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
+              }
+          }
+      }
+
+    }
+
+    private void sendResponse(OutputStream outputStream, String response) throws IOException{
+      outputStream.write(response.getBytes("UTF-8"));
+      outputStream.flush();
     }
 }
