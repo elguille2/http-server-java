@@ -57,6 +57,14 @@ public class Main {
           if (method.equals("GET")){
               if (path.equals("/")){
                   sendResponse(outputStream, "HTTP/1.1 200 OK\r\n\r\n");
+              } else if (path.startsWith("/echo/")) {
+                  String echoMessage = path.substring(6);
+                  String response = "HTTP/1.1 200 OK\r\n" +
+                                    "Content-Type: text/plain\r\n" +
+                                    "Content-Length: " + echoMessage.length() + "\r\n" +
+                                    "\r\n" +
+                                    echoMessage;
+                  sendResponse(outputStream, response);
               } else {
                   sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
               }
