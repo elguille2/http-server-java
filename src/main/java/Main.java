@@ -19,14 +19,15 @@ public class Main {
             while(true){
                 Socket clientSocket = serverSocket.accept(); // Wait for connection from client
                 System.out.println("Accepted new connection");
-                handleClientConnection(clientSocket);
+                // Handle each connection in a new thread to support concurrent connections
+                new Thread(() -> handleClientConnection(clientSocket)).start();
             }
         } catch (IOException e) {
             System.out.println("IOException: " + e.getMessage());
         }
     }
 
-    private static void handleClientConnection(Socket clientSocket) throws IOException{
+    private static void handleClientConnection(Socket clientSocket) {
       // Try-with-resources to automatically close the output stream
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
            OutputStream outputStream = clientSocket.getOutputStream()) {
