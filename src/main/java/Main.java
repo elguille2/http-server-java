@@ -37,7 +37,7 @@ public class Main {
              OutputStream outputStream = clientSocket.getOutputStream()) {
             HttpRequest request = parseRequest(reader);
             if (request != null)
-                handleRequest(request, outputStream);
+                handleRequest(request, outputStream, reader);
         } catch (IOException e) {
             System.out.println("IOException while handling client connection: " + e.getMessage());
         } finally {
@@ -73,7 +73,7 @@ public class Main {
         return request;
     }
 
-    private static void handleRequest(HttpRequest request, OutputStream outputStream) throws IOException {
+    private static void handleRequest(HttpRequest request, OutputStream outputStream, BufferedReader reader) throws IOException {
         if (request.method.equals("GET")) {
             if (request.path.equals("/")) {
                 sendResponse(outputStream, "HTTP/1.1 200 OK\r\n\r\n");
@@ -101,6 +101,16 @@ public class Main {
             } else {
                 sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
             }
+        } else if (request.method.equals("POST")) {
+            if (request.path.startsWith("/files/")){
+                // Handle POST request to create a new file with the request body
+                handlePostFileRequest(request, outputStream, reader);
+            } else {
+                sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
+            }
+        } else {
+            sendResponse(outputStream, "HTTP/1.1 405 Method Not Allowed\r\n\r\n");
+
         }
     }
 
@@ -123,6 +133,22 @@ public class Main {
         } else {
             sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
         }
+    }
+
+    private static void handlePostFileRequest(HttpRequest request, OutputStream outputStream, BufferedReader reader) throws IOException{
+        String fileName = request.path.substring(7);
+        File file = new File(filesDirectory, fileName);
+
+        // Read the request body
+        int contentLength = Integer.parseInt(request.headers.get("Content-Length"));
+        char[] content = new char[contentLength];
+        reader.read(content, 0, contentLength);
+
+        // Write the content to a new file
+        try(FileWriter fileWriter = new FileWriter(file)){
+            fileWriter.write(content); // This method uses a char array
+        }
+        sendResponse(outputStream, "HTTP/1.1 201 Created\r\n\r\n");
     }
 
     private static void sendResponse(OutputStream outputStream, String response) throws IOException {
