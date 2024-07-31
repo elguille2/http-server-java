@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Map;
 
 public class Main {
 
@@ -76,7 +77,7 @@ public class Main {
     private static void handleRequest(HttpRequest request, OutputStream outputStream, BufferedReader reader) throws IOException {
         if (request.method.equals("GET")) {
             if (request.path.equals("/")) {
-                sendResponse(outputStream, "HTTP/1.1 200 OK\r\n\r\n");
+                sendResponse(outputStream, "HTTP/1.1 200 OK\r\n\r\n", request.headers);
             } else if (request.path.startsWith("/echo/")) {
                 // Extract the message from the path
                 String echoMessage = request.path.substring(6);
@@ -85,7 +86,7 @@ public class Main {
                         "Content-Length: " + echoMessage.length() + "\r\n" +
                         "\r\n" +
                         echoMessage;
-                sendResponse(outputStream, response);
+                sendResponse(outputStream, response, request.headers);
             } else if (request.path.equals("/user-agent")) {
                 String userAgent = request.headers.get("User-Agent");
                 if (userAgent == null) userAgent = "";
@@ -94,30 +95,30 @@ public class Main {
                         "Content-Length: " + userAgent.length() + "\r\n" +
                         "\r\n" +
                         userAgent;
-                sendResponse(outputStream, response);
+                sendResponse(outputStream, response, request.headers);
             } else if (request.path.startsWith("/files/")) {
                 // Handle request for a file from the files directory
-                handleFileRequest(request.path.substring(7), outputStream);
+                handleFileRequest(request, outputStream);
             } else {
-                sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
+                sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n", request.headers);
             }
         } else if (request.method.equals("POST")) {
             if (request.path.startsWith("/files/")){
                 // Handle POST request to create a new file with the request body
                 handlePostFileRequest(request, outputStream, reader);
             } else {
-                sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
+                sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n", request.headers);
             }
         } else {
-            sendResponse(outputStream, "HTTP/1.1 405 Method Not Allowed\r\n\r\n");
+            sendResponse(outputStream, "HTTP/1.1 405 Method Not Allowed\r\n\r\n", request.headers);
 
         }
     }
 
-    private static void handleFileRequest(String fileName, OutputStream outputStream) throws IOException{
+    private static void handleFileRequest(HttpRequest request, OutputStream outputStream) throws IOException {
+        String fileName = request.path.substring(7);
         File file = new File(filesDirectory, fileName);
         if (file.exists() && file.isFile()) {
-            // Load the file content into memory to send it in the HTTP response.
             FileInputStream fis = new FileInputStream(file); // Open an input stream to read the file
             byte[] fileContent = new byte[(int) file.length()];
             fis.read(fileContent);
@@ -131,7 +132,7 @@ public class Main {
             outputStream.write(fileContent); // Write the file content
             outputStream.flush();
         } else {
-            sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n");
+            sendResponse(outputStream, "HTTP/1.1 404 Not Found\r\n\r\n", request.headers);
         }
     }
 
@@ -148,10 +149,13 @@ public class Main {
         try(FileWriter fileWriter = new FileWriter(file)){
             fileWriter.write(content); // This method uses a char array
         }
-        sendResponse(outputStream, "HTTP/1.1 201 Created\r\n\r\n");
+        sendResponse(outputStream, "HTTP/1.1 201 Created\r\n\r\n", request.headers);
     }
 
-    private static void sendResponse(OutputStream outputStream, String response) throws IOException {
+    private static void sendResponse(OutputStream outputStream, String response, Map<String, String> headers) throws IOException {
+        if(headers.containsKey("Accept-Encoding") && headers.get("Accept-Encoding").contains("gzip")){
+            response = response.replace("Content-Type: text/plain", "Content-Type: text/plain\r\nContent-Encoding: gzip\r\n");
+        }
         outputStream.write(response.getBytes("UTF-8"));
         outputStream.flush();
     }
